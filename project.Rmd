@@ -1,0 +1,60 @@
+Project gss
+========================================================
+
+load("C:/R/Data Analysis and Statistical Inference/Project1/statistics_project_gss.Rdata")
+attach(gss)
+library(ggplot2)
+
+```{r}
+
+tabNA <- table(premarsx, attend,useNA='ifany')
+tab <- table( attend, premarsx)
+ftab <- ftable(tapply(coninc, list(attend, premarsx),mean, na.rm=T))
+write.csv(tab, 'tabb.csv')
+
+```
+
+
+```{r}
+barplot(table(attend, year,useNA='ifany' ),las=2,col=(rainbow(10)),legend=c(levels(attend),'NA'),args.legend=list(x='topleft'),cex.names=.7)
+```
+
+```{r}
+barplot(table(premarsx, year,useNA='ifany' ),las=2,col=(rainbow(6)),legend=c(levels(premarsx),'NA'),args.legend=list(x='topleft'),cex.names=.7)
+```
+
+//STATISTICAL ANALYSIS
+
+```{r}
+gss <- read.csv('gss.csv',header=T)
+gss[,1] <- NULL
+data <-  gss[,c(2,3,8,15,32,92,4,20)]
+data <- na.omit(data)
+
+d <- data
+attach(d)
+
+l <- levels(data[,5])
+d[,5] <- as.character(d[,5])
+d[d$attend=='Once A Year',5] <- '1'
+d[d$attend==l[1],5] <-  '130'
+d[d$attend == l[2],5] <- '48'
+d[d$attend == l[3],5] <- '.5'
+d[d$attend == l[4],5] <- '130'
+d[d$attend == l[5],5] <- '36'
+d[d$attend == l[6],5] <- '12'
+d[d$attend == l[8],5] <- '6'
+
+d[,5] <- as.numeric(d[,5])
+d[,5] <- as.factor( ifelse(d[,5] > 20, 'Religious','Not Religious'))
+
+l2 <- levels(premarsx)
+
+d[,6] <- as.character(d[,6])
+d[d$premarsx == l2[1],6] <- l2[2]
+d[d$premarsx == l2[4],6] <- l2[3]
+d[,6] <- as.factor(d[,6])
+```
+
+
+

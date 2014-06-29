@@ -1,0 +1,78 @@
+IRIS DATA SET LINEAR MODELLING
+========================================================
+
+
+```{r}
+data(iris)
+linearModel = lm(iris$Sepal.Length ~ iris$Sepal.Width)
+unexplainedByModel = linearModel$residuals
+```
+
+Now we can make some plots of the other variables and how they relate to the stuff not explained by the linear model
+```{r}
+plot(iris$Petal.Length,unexplainedByModel)
+
+```
+
+#note gap and a trend for greater petal length to explain what was not explained by the lm
+```{r}
+plot(iris$Petal.Width,unexplainedByModel)
+```
+
+#note gap and a trend for greater petal length to explain what was not explained by the lm, but less tight than Petal.Length
+```{r}
+
+boxplot(unexplainedByModel ~ iris$Species)
+```
+
+#those are some pretty significant differences as all the central boxes are clear of each other
+
+So at the moment, it looks like Species is really, really important. If we want to see the differences Petal.Length, but colour the results by species, we could do that. There are a couple of ways, but I like to build my graphs up from basic principles over a bunch of steps:
+
+#we are going to need to get the axis scales formally set for doing a multiple plot
+```{r}
+
+maxy= max(unexplainedByModel)
+miny= min(unexplainedByModel)
+maxx= max(iris$Petal.Length)
+minx= min(iris$Petal.Length)
+
+```
+
+#have enough colours for everything we are going to plot
+```{r}
+
+colist = c("#FF000033","#00FF0033","#0000FF33")
+
+```
+
+#our base graph
+```{r}
+
+rowcriteria = iris$Species=="setosa"
+plot(iris$Petal.Length[rowcriteria], jitter(unexplainedByModel[rowcriteria], factor=0.3), col= colist[1], pch=19, xlim=c(minx,maxx), ylim=c(miny,maxy), frame.plot=FALSE, xlab="Petal Length", ylab="Residuals")
+```
+#we add our next set of points
+```{r}
+rowcriteria = iris$Species=="versicolor"
+points(iris$Petal.Length[rowcriteria], jitter(unexplainedByModel[rowcriteria], factor=0.3), col= colist[2], pch=19)
+
+```
+
+#and we add our final set
+```{r}
+rowcriteria = iris$Species=="virginica"
+points(iris$Petal.Length[rowcriteria], jitter(unexplainedByModel[rowcriteria], factor=0.3), col= colist[3], pch=19)
+
+```
+
+
+#now let's add a legend
+```{r}
+labels <- c('setosa', 'versicolor', "virginica")
+position <- 'topleft'
+inset <- c(0.02, 0)
+legend(position, labels, fill=colist, inset=inset)
+```
+
+

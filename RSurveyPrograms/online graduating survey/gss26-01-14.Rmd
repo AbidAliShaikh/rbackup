@@ -1,0 +1,20 @@
+Title
+========================================================
+The graduating student survey reading in online data
+library(likert)
+library(reshape)
+```{r}
+gs <- read.csv('onlineproformaGSS.csv',header=T)
+gl <- gs[,4:18]
+for (i in 1:14)
+  {
+  gl[,i] <- factor(gl[,i], levels=c('Strongly Disagree','Disagree','Somewhat Agree','Agree','Strongly Agree'))
+  }
+glik <-   likert(gl[,1:14], grouping=gs[,2])
+
+pdf(file='Graduating Students Survey2013.pdf',height=3*nrow(gl))
+plot(glik)
+dev.off()
+
+```
+

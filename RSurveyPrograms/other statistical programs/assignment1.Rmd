@@ -1,0 +1,271 @@
+Loans Issued through a Lending Club
+========================================================
+library(knitr) # required for generating R Markdown like this one
+
+INTRODUCTION:
+The Loans Data is collected from https://spark-public.s3.amazonaws.com/dataanalysis/loansData.rda, which includes 2500 peer to peer loans issued through the Lending Club 
+https://www.lendingclub.com/home.action
+
+library(psych)
+library(multilevel)
+library(car)
+library(ggplot2)
+library(reshape)
+
+```{r}
+
+
+#download.file(url='https://spark-public.s3.amazonaws.com/dataanalysis/loansData.rda',destfile='loans.rda')
+load('../Assignment 1/data/loansData.rda')
+summary(loansData)
+
+```
+
+First we check if there are any NA values in file and tidying the data
+```{r}
+loansData$Employment.Length[loansData$Employment.Length == 'n/a'] <- NA
+loansData$Employment.Length[loansData$Employment.Length == '< 1 year'] <- 0.5
+loansData$Employment.Length <- as.numeric(gsub(' years$| year$|\\+','',loansData$Employment.Length))
+attach(loansData)
+sum(is.na(loansData))
+loans <- na.omit(loansData)
+attach(loans)
+summary(loans)
+```
+
+We now have 2298 obs. of 14 variables of data without NA's; we observe that Interest Rate and Debt to Income Ratio is in % so we clean that. Also we fine tuned the FICO Range column to make it easier to calculate means of the ranges:
+```{r}
+loans[,3] <- as.numeric(gsub('%','',loans[,3]))
+loans[,6] <- as.numeric(gsub('%','',loans[,6]))
+library(reshape)
+loans <- transform(loans, FICO.Range = colsplit(FICO.Range, split='-', names=c('low','high')))
+attach(loans)
+
+```
+
+THE EXPLORATORY ANALYSIS
+
+```{r}
+hist(rowMeans(FICO.Range), breaks=20)
+summary(rowMeans(FICO.Range))
+mean(rowMeans(FICO.Range))
+boxplot(Monthly.Income ~ State)
+loans <- loans[Monthly.Income < 30000,]
+```
+
+The histogram of means of FICO Ranges is heavily right skewed with mean 707.74 and overall mean ranges from 642 to 832 dispersed over a 190 interval. 
+
+CONFOUNDERS IN Monthly Income:
+There are obvious confounders in Monthly specially in New York.
+
+Next we try to find relationship between Interest Rate and Mean FICO Ranges
+
+```{r}
+cor.test( rowMeans(FICO.Range), Interest.Rate)
+
+```
+
+We get correlation of -0.71 with p-value < 2.2e-16. Hence Interest Rate is negatively associated with the FICO Range. Greater the FICO Score the borrower is likely to get the loan at a lower interest rate overall in all states.
+
+for this lets first make a basic model:
+
+```{r}
+model1 <- lm(Interest.Rate ~ rowMeans(FICO.Range))
+summary(model1)
+```
+R-squared is 50% which is the variance in Interest Rate defined by the FICO Range.
+
+Lets see if any state has any reservation on that trend:
+
+```{r}
+model2 <- lm(Interest.Rate ~ rowMeans(FICO.Range)+State)
+summary(model2)
+```
+
+We see that it is consistent accross almost all states considering the significant p-values.
+
+
+
+```{r}
+model3 <- lm(Interest.Rate ~ rowMeans(FICO.Range)+Monthly.Income+Revolving.CREDIT.Balance+Inquiries.in.the.Last.6.Months)
+summary(model3)
+```
+Not much difference yet
+
+```{r}
+cor (Interest.Rate, Revolving.CREDIT.Balance)
+
+
+```
+
+.06
+
+```{r}
+#library(ggplot2)
+model4 <- lm(Interest.Rate ~  log10(Amount.Funded.By.Investors+1) + rowMeans(FICO.Range) )
+summary(model4)
+ggplot(loans, aes(x=rowMeans(FICO.Range),y=Interest.Rate))+geom_smooth(method = 'lm')+geom_point(aes(color=Amount.Funded.By.Investors))+ggtitle('Fig 2')
+```
+Greater the amount funded greater the interest t=32.65 for Amount by Investors
+
+```{r}
+model5 <- lm (Interest.Rate ~ rowMeans(FICO.Range) +Employment.Length)
+summary(model5)
+confint(model5)
+```
+A very weak correlation between employment length and Interest Rate
+OUR FINAL MODEL IS 
+```{r}
+model6a <- lm(Interest.Rate ~ rowMeans(FICO.Range) + Amount.Funded.By.Investors+Loan.Length)
+
+modi <- influence.measures(model6)
+inf <- which (apply(modi$is.inf,1,any))
+a <- 1:nrow(loans)
+model6 <- lm(Interest.Rate ~ rowMeans(FICO.Range) + Amount.Funded.By.Investors+Loan.Length, subset=(a[-inf]))
+
+plot(rowMeans(FICO.Range), model6$residuals, col=c(as.numeric(Loan.Length)*100), pch=19, main='Fig 3: Colored Residuals factored on Loan Lengths',xlab='FICO Score',ylab='Residuals')
+plot(model6$fitted, model6$residuals, col=c(as.numeric(Loan.Length)*100), main='Fig 4: Colored Model factored on Loan Lengths',xlab='Fitted Values',ylab='Residuals',pch=19)
+
+plot(rowMeans(FICO.Range), model6$residuals, cex=Amount.Funded.By.Investors/max(Amount.Funded.By.Investors), pch=19,main='Sized Residual ratios on Amount Funded by Investor' )
+
+plot(model6$fitted, model6$residuals, cex=Amount.Funded.By.Investors/max(Amount.Funded.By.Investors), main='Sized point ratios on Amount Funded by Investors',pch=19)
+
+hist(FICO.Range,main='FICO Range Histogram')
+
+summary(model6)
+
+```
+
+
+
+
+```{r}
+
+
+l[,c(4)] <- as.numeric(as.factor(loans[,c(4)]))
+l[,c(5)] <- as.numeric(as.factor(loans[,c(5)]))
+l[,c(7)] <- as.numeric(as.factor(loans[,c(7)]))
+l[,c(8)] <- as.numeric(as.factor(loans[,c(8)]))
+l$meanFICO <- rowMeans(FICO.Range)
+library(ellipse)
+ctab=cor(l[,-10])
+windows()
+colorfun <- colorRamp(c('yellow','skyblue','red'), space="Lab")
+plotcorr(ctab, col=rgb(colorfun((ctab+1)/2), maxColorValue=255))
+title('Fig 1: Correlation Matrix')
+
+model7 <- lm(log10(Monthly.Income) ~ Home.Ownership+Employment.Length+Loan.Purpose)
+summary(model7)
+```
+
+MEDIATIONAL ANALYSIS
+```{r}
+library(multilevel)
+attach(loans)
+model.sobel <- sobel( Inquiries.in.the.Last.6.Months ,rowMeans(FICO.Range), Interest.Rate)
+model.sobel
+
+model.sobel2 <- sobel( as.numeric(as.factor(Home.Ownership)) ,rowMeans(FICO.Range), Interest.Rate)
+model.sobel2
+
+
+```
+
+```{r}
+model.sobel3 <- sobel(pred=log10(Amount.Requested),med=as.numeric(as.factor(Loan.Length)),out=Interest.Rate)
+model.sobel3
+
+
+```
+
+MODERATIONAL ANALYSIS
+```{r}
+
+model8 <- lm(Amount.Funded.By.Investors ~ rowMeans(FICO.Range)+ Interest.Rate+ (Interest.Rate*rowMeans(FICO.Range)))
+model81 <- lm(Amount.Funded.By.Investors ~ rowMeans(FICO.Range)+Interest.Rate)
+anova(model81, model8)
+
+#summary(model8)
+
+```
+
+Looking at modelling tree we can see there is some complex machanism going on in selection of interest rates; and the most effect comes from FICO range.Then for different fico ranges the decision is furthered on amount funded, yet the main effect is that of FICO
+
+```{r}
+pdf(height=13, width=13)
+mod0 <- tree(Interest.Rate ~ rowMeans(FICO.Range)+Amount.Funded.By.Investors+Revolving.CREDIT.Balance+Monthly.Income+Home.Ownership)
+dev.off()
+```
+
+
+
+
+
+Let's see effect of FICO on amount funded is nested on  Interest rate 
+
+```{r}
+model9 <- lm(Amount.Funded.By.Investors ~  rowMeans(FICO.Range)^2 / Interest.Rate)
+summary(model9)
+
+```
+OR THE INTERACTION
+```{r}
+model91 <- lm(Amount.Funded.By.Investors ~  rowMeans(FICO.Range) : Interest.Rate)
+summary(model91)
+```
+
+THOSE WHO HAVE HOMES HAVE RELATIVELY LOWER INCOME AND THEY ARE CORRELATED WITH SOME STATES
+
+
+
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+attach(loansData)
+model1 <- lm(Interest.Rate ~ Debt.To.Income.Ratio)
+summary(model1) # Only 3% variance is explained by this model
+summary(Employment.Length)
+tapply(Interest.Rate, Employment.Length, sum) # No relationship
+model2 <- lm(Interest.Rate ~ Inquiries.in.the.Last.6.Months)
+summary(model2) # Only 2.7 variance explained
+model3 <- lm(Interest.Rate ~ Revolving.CREDIT.Balance)
+summary(model3) # no luck
+model4 <- lm(Interest.Rate ~ Open.CREDIT.Lines)
+summary(model4) # no luck
+## LETS PLAY WITH FICO RANGE
+library(reshape)
+loansData <- transform(loansData, FICO.Range = colsplit(FICO.Range, split='-', names=c('low','high')))
+attach(loansData)
+loansData$meanFICO <- rowMeans(FICO.Range)
+attach(loansData)
+head(loansData)
+model5<- lm (Interest.Rate ~ meanFICO)
+summary(model5)    # WOW! 50% variance is defined by the model and it is significant 
+## LETS DO THE MEDIATION ANALYSIS BY SOBEL FUNCTION
+library(multilevel)
+model.sobel <- sobel(meanFICO, Inquiries.in.the.Last.6.Months , Interest.Rate)
+model.sobel # z value is -3.88 which is high enough, so inquiries mediates the effect statistically negatively
+model.sobel2 <- sobel( Inquiries.in.the.Last.6.Months ,meanFICO, Interest.Rate)
+model.sobel2 # z value is 4.6 which is higher enough, so meanFICO mediates the effect
+
+

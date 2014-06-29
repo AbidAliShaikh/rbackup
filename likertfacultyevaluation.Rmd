@@ -1,0 +1,95 @@
+FACULTY EVALUATION ANALYSIS USING LIKERT SCALE
+========================================================
+The data for each department may be stored separately in files
+and complete picture of each department can be had in a pdf 
+file with groupings of faculty member names...
+
+library(likert)
+library(reshape)
+
+First we transpose the data from column 9 to 109 
+
+```{r}
+al <- read.csv('All Proforma Data (Faculty Survey).csv',header=T)
+resp <- t(al[,9:108])
+colnames(resp) <- t(al[,8]) 
+
+```
+
+We trim unused rows at the last filled with the NAs and add faculty member names so many times as many are observations for each
+```{r}
+resp<- resp[rowSums(resp,na.rm=T)!=0,]
+obs<-c()
+for (i in seq(1,ncol(resp),18)) 
+  obs <- append(obs,sum(rowSums(resp[,i:c(i+17)],na.rm=T)!=0))
+
+#splitting each succesive 18 columns and binding them  down in to rows
+totalobs = max(obs*length(obs))
+maxobs = max(obs)
+final<- c(NULL)
+i=1
+for (j in seq(1, totalobs, maxobs) )
+  {
+  final <- rbind(final, resp[1:maxobs,i:c(i+17)])
+  i=i+18
+}
+
+## adding faculty member names as row names
+row.names(final) <- rep(unique(al[,5]), each=maxobs)
+
+## cleaning rows with full NAs
+final <- final [rowSums(final,na.rm=T)!=0,]
+write.csv(final, 'FacEvalforlikert.csv')
+
+
+
+```
+
+Upto here we get clean data if we also want to include department names then we could add a column in the beggining and add just like we added faculty member names.
+
+Next we replace values 1 to 5 with the character equivalents and converting them into factors... 
+```{r}
+final <- as.data.frame(final)
+final[final==5]<-'Strongly Agree'
+final[final==4]<-'Agree'
+final[final==3] <- 'Somewhat Agree'
+final[final==2] <- 'Disagree'
+final[final==1] <- 'Strongly Disagree'
+colnames(final) <- as.character(al[1:18,7])
+for (i in 1:18)
+  final[,i] <- factor(final[,i], levels=c('Strongly Disagree','Disagree','Somewhat Agree','Agree','Strongly Agree'))
+
+
+
+
+```
+
+Finally printing the graph into a pdf 
+
+```{r}
+f <- likert(final, grouping=row.names(final))
+pdf(file='facevapharm.pdf',width=8.5, height=13, title='Faculty Evaluation',onefile=T)
+plot(f)
+
+names = unique(al[,5])
+for (k in names[1:4])
+  {
+  k = as.character(k)
+  fm <- final[k == row.names(final) ,]
+  #row.names(fm) <- row.names(final[names[k] == row.names(final) ,])
+  
+  f <- likert(fm)
+  print(plot(f))
+  }
+
+dev.off()
+
+```
+
+
+As some additions the question descriptions can be added and percents at the center may be dropped in plotting options.
+
+
+
+
+
