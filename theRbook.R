@@ -61,5 +61,20 @@ w <- read.table('crawley/SilwoodWeather.txt',header=T)
   pdf(file='tukey.pdf',height=50)
   plot(TukeyHSD(model))
   dev.off()
+  #################################
   
+  b <- read.table('crawley/box.txt', header=T)
+  levs <- reorder(b$fact, b$response, median)
+  g = ggplot(b, aes(x=b$fact, y=b$response))
+  g2 = g+ geom_boxplot(aes(x = levs))
+  
+  model <- aov (b$response~ levs)
+  T = TukeyHSD(model)
+  plot(T)
+  
+  ###############################3
+  attach(faithful)
+  hist(faithful$eruptions,15,freq=F)
+  lines(density(faithful$eruptions,n=200))
+  lines(density(faithful$eruptions,width=.5,n=200))
   
